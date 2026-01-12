@@ -5,6 +5,7 @@ import { cfg, type ApiConfig } from "../config";
 import type { BunRequest } from "bun";
 import { BadRequestError, NotFoundError, UserForbiddenError } from "./errors";
 import path from "path";
+import { randomBytes } from "crypto";
 
 type Thumbnail = {
   data: ArrayBuffer;
@@ -15,10 +16,6 @@ const MAX_UPLOAD_SIZE = 10 << 20;
 
 const formatThumbnailUrl = (videoId: string,extension : string) => {
   return `http://localhost:${cfg.port}/assets/${videoId}.${extension}`
-}
-
-const formatBase64Url = (mediaType: string,data: string) => {
-  return `data:${mediaType};base64,${data}`
 }
 
 const validThumbNailTypes = (mimeType : string) : boolean => {
@@ -34,8 +31,8 @@ const extractMediaType = (fileName: string) => {
   return splits[splits.length -1];
 }
 
-const formatFileName = (videoId : string,fileType : string) => {
-  return path.join(cfg.assetsRoot,videoId.concat(".",fileType))
+const formatFileName = (uniqueString : string,fileType : string) => {
+  return path.join(cfg.assetsRoot,uniqueString+"."+fileType)
 }
 
 export async function handlerGetThumbnail(cfg: ApiConfig, req: BunRequest) {
@@ -95,14 +92,16 @@ export async function handlerUploadThumbnail(cfg: ApiConfig, req: BunRequest) {
     throw new UserForbiddenError("video not found for this user")
   }
 
+  const uniqueFileName = randomBytes(32).toBase64()
+
   const newVideo = {
     ...video,
-    thumbnailURL : formatThumbnailUrl(videoId,extractMediaType(file.name))
+    thumbnailURL : formatThumbnailUrl(uniqueFileName,extractMediaType(file.name))
   }
 
-  console.log("filename: ",formatFileName(videoId,extractMediaType(file.name)))
+  console.log("filename: ",formatFileName(uniqueFileName,extractMediaType(file.name)))
 
-  Bun.write(formatFileName(videoId,extractMediaType(file.name)),arrBuff)
+  Bun.write(formatFileName(uniqueFileName,extractMediaType(file.name)),arrBuff)
 
   updateVideo(cfg.db,newVideo)
 
