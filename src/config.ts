@@ -1,5 +1,6 @@
 import { newDatabase } from "./db/db";
 import type { Database } from "bun:sqlite";
+import { S3Client } from "bun";
 
 export type ApiConfig = {
   db: Database;
@@ -10,6 +11,7 @@ export type ApiConfig = {
   s3Bucket: string;
   s3Region: string;
   s3CfDistribution: string;
+  s3client: S3Client;
   port: string;
 };
 
@@ -22,8 +24,18 @@ const s3Bucket = envOrThrow("S3_BUCKET");
 const s3Region = envOrThrow("S3_REGION");
 const s3CfDistribution = envOrThrow("S3_CF_DISTRO");
 const port = envOrThrow("PORT");
+const awsAccessId = envOrThrow("AWS_ACCESS_KEY_ID");
+const awsAccessKey = envOrThrow("AWS_SECRET_ACCESS_KEY");
+
 
 const db = newDatabase(pathToDB);
+
+const s3client = new S3Client({
+  accessKeyId: awsAccessId,
+  secretAccessKey: awsAccessKey,
+  bucket: s3Bucket,
+  region: s3Region
+});
 
 export const cfg: ApiConfig = {
   db: db,
@@ -34,6 +46,7 @@ export const cfg: ApiConfig = {
   s3Bucket: s3Bucket,
   s3Region: s3Region,
   s3CfDistribution: s3CfDistribution,
+  s3client: s3client,
   port: port,
 };
 

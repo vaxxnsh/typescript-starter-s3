@@ -12,7 +12,7 @@ type Thumbnail = {
   mediaType: string;
 };
 
-const MAX_UPLOAD_SIZE = 10 << 20;
+const MAX_THUMBNAIL_UPLOAD_SIZE = 10 << 20;
 
 const formatThumbnailUrl = (videoId: string,extension : string) => {
   return `http://localhost:${cfg.port}/assets/${videoId}.${extension}`
@@ -81,7 +81,7 @@ export async function handlerUploadThumbnail(cfg: ApiConfig, req: BunRequest) {
     throw new BadRequestError("Invalid file type")
   }
 
-  if(file.size > MAX_UPLOAD_SIZE) {
+  if(file.size > MAX_THUMBNAIL_UPLOAD_SIZE) {
     throw new BadRequestError("File size exceeds 10 mb")
   }
 
