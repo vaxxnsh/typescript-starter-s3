@@ -21,6 +21,14 @@ const formatBase64Url = (mediaType: string,data: string) => {
   return `data:${mediaType};base64,${data}`
 }
 
+const validThumbNailTypes = (mimeType : string) : boolean => {
+  switch (mimeType) {
+    case "image/jpeg": return true
+    case "image/png" : return true
+    default: return false
+  }
+}
+
 const extractMediaType = (fileName: string) => {
   const splits = fileName.split(".")
   return splits[splits.length -1];
@@ -70,6 +78,10 @@ export async function handlerUploadThumbnail(cfg: ApiConfig, req: BunRequest) {
   
   if (!(file instanceof File)) {
     throw new BadRequestError("Thumbnail file missing");
+  }
+
+  if (!validThumbNailTypes(file.type)) {
+    throw new BadRequestError("Invalid file type")
   }
 
   if(file.size > MAX_UPLOAD_SIZE) {
