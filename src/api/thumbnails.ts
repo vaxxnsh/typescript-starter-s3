@@ -11,10 +11,18 @@ type Thumbnail = {
 };
 
 const MAX_UPLOAD_SIZE = 10 << 20;
-const videoThumbnails: Map<string, Thumbnail> = new Map();
 
 const formatThumbnailUrl = (videoId: string) => {
   return `http://localhost:${cfg.port}/api/thumbnails/${videoId}`
+}
+
+const formatBase64Url = (mediaType: string,data: string) => {
+  return `data:${mediaType};base64,${data}`
+}
+
+const extractMediaType = (dataUrl: string): string | null => {
+  const match = dataUrl.match(/^data:([^;]+);base64,/)
+  return match ? match[1] : null
 }
 
 export async function handlerGetThumbnail(cfg: ApiConfig, req: BunRequest) {
@@ -28,12 +36,12 @@ export async function handlerGetThumbnail(cfg: ApiConfig, req: BunRequest) {
     throw new NotFoundError("Couldn't find video");
   }
 
-  const thumbnail = videoThumbnails.get(videoId);
+  const thumbnail = video.thumbnailURL;
   if (!thumbnail) {
     throw new NotFoundError("Thumbnail not found");
   }
 
-  return new Response(thumbnail.data, {
+  return new Response(thumbnail, {
     headers: {
       "Content-Type": thumbnail.mediaType,
       "Cache-Control": "no-store",
@@ -63,10 +71,10 @@ export async function handlerUploadThumbnail(cfg: ApiConfig, req: BunRequest) {
     throw new BadRequestError("File size exceeds 10 mb")
   }
 
-  const buff = await file.arrayBuffer();
+  const arrBuff = await file.arrayBuffer();
 
   const thumbnail: Thumbnail = {
-    data: buff,
+    data: arrBuff,
     mediaType: file.type
   }
   const video = getVideo(cfg.db,videoId);
@@ -75,14 +83,14 @@ export async function handlerUploadThumbnail(cfg: ApiConfig, req: BunRequest) {
     throw new UserForbiddenError("video not found for this user")
   }
 
-  videoThumbnails.set(video.id,thumbnail);
+  const base64 = Buffer.from(arrBuff).toBase64();
 
   const newVideo = {
     ...video,
-    thumbnailURL : formatThumbnailUrl(videoId)
+    thumbnailURL : formatBase64Url(thumbnail.mediaType,base64)
   }
 
   updateVideo(cfg.db,newVideo)
 
-  return respondWithJSON(200, newVideo);
+  return respondWithJSON(200, [newVideo]);
 }
