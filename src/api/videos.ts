@@ -83,51 +83,57 @@ export async function handlerUploadVideo(cfg: ApiConfig, req: BunRequest) {
   const file = formData.get("video");
 
   console.log("uploading video with videoId", videoId, "by user", userID);
-  
+
   if (!(file instanceof File)) {
     throw new BadRequestError("Video file missing");
   }
 
-  if(file.size > MAX_VIDEO_UPLOAD_SIZE) {
-    throw new BadRequestError("File size exceeds 1 gb")
+  if (file.size > MAX_VIDEO_UPLOAD_SIZE) {
+    throw new BadRequestError("File size exceeds 1 gb");
   }
 
-  if(file.type !== "video/mp4") {
-    throw new BadRequestError("Invalid file type")
+  if (file.type !== "video/mp4") {
+    throw new BadRequestError("Invalid file type");
   }
 
-  const video = getVideo(cfg.db,videoId);
+  const video = getVideo(cfg.db, videoId);
 
   if (!video || video.userID !== userID) {
-    throw new UserForbiddenError("video not found for this user")
+    throw new UserForbiddenError("video not found for this user");
   }
 
   const arrBuff = await file.arrayBuffer();
   const uuid = randomBytes(32).toHex();
-  const s3Key = `videos/${uuid}.mp4`;
   const filePath = generateVideoFilePath(uuid);
 
-  try {
-    await Bun.write(filePath,arrBuff);
+  let s3Key: string;
 
-    await cfg.s3client.file(s3Key,{
-      type : "video/mp4"
-    }).write(Bun.file(filePath));
-  } 
-  catch(err) {
-    throw err
-  }
-  finally {
+  try {
+    await Bun.write(filePath, arrBuff);
+
+    const aspectRatio = await getVideoAspectRatio(filePath);
+
+    s3Key = `videos/${aspectRatio}/${uuid}.mp4`;
+
+    await cfg.s3client
+      .file(s3Key, {
+        type: "video/mp4",
+      })
+      .write(Bun.file(filePath));
+  } catch (err) {
+    throw err;
+  } finally {
     await unlink(filePath);
   }
 
-  const newVideo : Video = {
+  const newVideo: Video = {
     ...video,
     updatedAt: new Date(),
-    videoURL: formatAwsUrlForS3(s3Key)
-  }
+    videoURL: formatAwsUrlForS3(s3Key),
+  };
 
-  updateVideo(cfg.db, newVideo)
+  updateVideo(cfg.db, newVideo);
 
   return respondWithJSON(200, null);
 }
+
