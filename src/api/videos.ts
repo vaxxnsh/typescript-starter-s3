@@ -15,7 +15,7 @@ const generateVideoFilePath = (uuid : string) => {
 }
 
 const formatAwsUrlForS3 = (s3Key : string) => {
-  return `https://${cfg.s3Bucket}.s3.${cfg.s3Region}.amazonaws.com/${s3Key}`
+  return `https://${cfg.s3CfDistribution}/${s3Key}`
 }
 
 async function getVideoAspectRatio(filePath: string): Promise<"landscape" | "portrait" | "other"> {
@@ -105,24 +105,6 @@ async function processVideoForFastStart(inputFilePath: string): Promise<string> 
   return outputPath;
 }
 
-function generatePresignedURL(cfg: ApiConfig, key: string, expireTime: number = 86400) : string {
-  const presignUrl = cfg.s3client.presign(key,{
-    expiresIn: expireTime
-  })
-
-  return presignUrl
-}
-
-export function dbVideoToSignedVideo(cfg: ApiConfig, video: Video) {
-  if(!video.videoURL) {
-    return
-  }
-  const presignedUrl = generatePresignedURL(cfg,video.videoURL)
-
-  video.videoURL = presignedUrl;
-}
-
-
 export async function handlerUploadVideo(cfg: ApiConfig, req: BunRequest) {
   const { videoId } = req.params as { videoId?: string };
   if (!videoId) {
@@ -177,18 +159,19 @@ export async function handlerUploadVideo(cfg: ApiConfig, req: BunRequest) {
   } catch (err) {
     throw err;
   } finally {
+    await unlink(await processVideoForFastStart(filePath)).catch(() => {})
     await unlink(filePath).catch(() => {});
   }
 
   const newVideo: Video = {
     ...video,
     updatedAt: new Date(),
-    videoURL: s3Key,
+    videoURL: formatAwsUrlForS3(s3Key),
   };
 
   updateVideo(cfg.db, newVideo);
 
-  return respondWithJSON(200, dbVideoToSignedVideo(cfg,newVideo));
+  return respondWithJSON(200, newVideo);
 }
 
 
