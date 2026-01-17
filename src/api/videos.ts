@@ -105,6 +105,23 @@ async function processVideoForFastStart(inputFilePath: string): Promise<string> 
   return outputPath;
 }
 
+function generatePresignedURL(cfg: ApiConfig, key: string, expireTime: number = 86400) : string {
+  const presignUrl = cfg.s3client.presign(key,{
+    expiresIn: expireTime
+  })
+
+  return presignUrl
+}
+
+export function dbVideoToSignedVideo(cfg: ApiConfig, video: Video) {
+  if(!video.videoURL) {
+    return
+  }
+  const presignedUrl = generatePresignedURL(cfg,video.videoURL)
+
+  video.videoURL = presignedUrl;
+}
+
 
 export async function handlerUploadVideo(cfg: ApiConfig, req: BunRequest) {
   const { videoId } = req.params as { videoId?: string };
@@ -166,12 +183,12 @@ export async function handlerUploadVideo(cfg: ApiConfig, req: BunRequest) {
   const newVideo: Video = {
     ...video,
     updatedAt: new Date(),
-    videoURL: formatAwsUrlForS3(s3Key),
+    videoURL: s3Key,
   };
 
   updateVideo(cfg.db, newVideo);
 
-  return respondWithJSON(200, null);
+  return respondWithJSON(200, dbVideoToSignedVideo(cfg,newVideo));
 }
 
 
